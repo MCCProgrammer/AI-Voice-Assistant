@@ -1,24 +1,48 @@
-# 🎙️ Jarvis — AI Voice Assistant
+<h1 align="center">🎙️ Jarvis — AI Voice Assistant</h1>
 
-A desktop voice assistant powered by **Claude** (through [OpenRouter](https://openrouter.ai)). Say **“Hey Jarvis”**, ask anything, and it answers out loud with a natural neural voice — looking things up on the web, checking the weather, opening apps, setting timers and remembering things about you along the way.
+<p align="center">
+  A desktop voice assistant powered by <b>Claude</b> through <a href="https://openrouter.ai">OpenRouter</a>.<br>
+  Just talk: it answers out loud with a natural voice, shows the details as beautiful cards,<br>
+  and gets things done — weather, web, news, reminders, folders, apps, YouTube and more.
+</p>
 
-![Jarvis desktop app](docs/screenshot.png)
+<p align="center">
+  <img alt="Python" src="https://img.shields.io/badge/Python-3.10%2B-1f2328?style=flat-square&logo=python&logoColor=white">
+  <img alt="Claude" src="https://img.shields.io/badge/Claude-via%20OpenRouter-1f2328?style=flat-square&logo=anthropic&logoColor=white">
+  <img alt="Platforms" src="https://img.shields.io/badge/macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-1f2328?style=flat-square">
+</p>
+
+![Jarvis answering a weather question with a forecast card](docs/main.png)
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/mini.png" alt="Floating mini mode over other windows"><br><sub><b>Floating mini mode</b> — a transparent, always-on-top orb with live captions and compact cards.</sub></td>
+    <td width="50%"><img src="docs/cards.png" alt="News and YouTube cards"><br><sub><b>Visual cards</b> — news, YouTube, web results, Wikipedia, timers and more.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/reminders.png" alt="Reminders tab"><br><sub><b>Reminders</b> — saved to disk, announced out loud and as a notification.</sub></td>
+    <td width="50%"><img src="docs/skills.png" alt="What I can do tab"><br><sub><b>What I can do</b> — every skill with example phrases you can click.</sub></td>
+  </tr>
+</table>
 
 ## Features
 
-- 🗣️ **Three listening modes** — **Always on** (just talk; say “stop” to pause, “start listening” to resume), **Hey Jarvis** (local wake word with [openWakeWord](https://github.com/dscripka/openWakeWord)), or **Push to talk** (Space or click the orb). Your choice is remembered.
-- 🧠 **Real conversation** — Claude keeps context, follows up, and decides by itself which tools to use.
-- ⚡ **Low latency** — replies are streamed and spoken sentence by sentence, so it starts talking before it finishes thinking.
-- 🔁 **Natural conversation** — after “Hey Jarvis” it waits for you to think and tolerates pauses mid-sentence. After an action or answer the mic closes; when it asks you a question it keeps listening for your answer until you reply or say “never mind”/“stop”. Background noise and the tail of its own voice are ignored.
-- 🔔 **Reminders** — “remind me to call mum tomorrow at 6pm” is saved to disk, listed in the Reminders tab, and announced with a spoken alert and a system notification, even after a restart.
-- 📂 **Your computer** — “open my Downloads folder”, any folder by name, apps, volume, battery, plus named **shortcuts** (“open my GitHub repositories”) you can create by voice.
-- 🧭 **“What I can do” tab** listing every skill with example phrases you can click to try.
-- 🛠️ **24 tools** — web search, news, reading web pages, Wikipedia, weather, YouTube, folders, apps, websites, shortcuts, volume, battery/CPU, timers, reminders, notes and long-term memory.
-- 🃏 **Visual cards** — it speaks the short answer and shows the details: weather with an hourly chart and 7-day forecast (plus “not the right place?” suggestions if it misheard), web results, news with images, Wikipedia, YouTube, notes, live timers and system gauges. Click your own message to fix a misheard question and resend it.
+**Talking**
+- 🗣️ **Three listening modes** — **Always on** (just talk; say “stop” to pause and “start listening” to resume), **Hey Jarvis** (local wake word with [openWakeWord](https://github.com/dscripka/openWakeWord)) or **Push to talk** (Space or click the orb). Your choice is remembered.
+- 🔁 **Natural turn-taking** — it waits for you to think and tolerates pauses mid-sentence. After an action or answer the mic closes; when it asks you something, it keeps listening for your answer until you reply or say “never mind”. Background noise, fillers and the tail of its own voice are ignored.
+- ⚡ **Low latency** — replies stream and are spoken sentence by sentence, so it starts talking before it finishes thinking.
+
+**Seeing**
+- 🃏 **Visual cards** — it says the short answer and shows the details: weather with an hourly chart and 7-day forecast, web results, news with images, Wikipedia, YouTube, notes, live timers and system gauges.
+- 🎯 **Easy to correct** — cards show what it understood (the weather card says which place it found and offers alternatives), and clicking your own message lets you fix and resend it.
+- 🪐 **Floating mini mode** — minimize the window and Jarvis becomes a transparent, always-on-top orb with HUD rings, live captions and compact cards that you can drag anywhere.
+
+**Doing**
+- 🛠️ **24 tools** — web search, news, reading pages, Wikipedia, weather, YouTube, folders, apps, websites, shortcuts, volume, battery/CPU, timers, reminders, notes and memory.
+- 🔔 **Reminders** — “remind me to call mum tomorrow at 6pm” is saved, listed in the Reminders tab and announced with a spoken alert and a system notification, even after a restart.
+- 📂 **Your computer** — “open my Downloads folder”, any folder by name, apps and volume, plus named **shortcuts** (“open my GitHub repositories”) you create by voice.
 - 💾 **Memory** — tell it your name or preferences and it remembers them across sessions.
-- 🎨 **Animated orb** that reacts to your voice and to its own, with a live transcript, tool activity and a text box for when you'd rather type.
-- 🪐 **Floating mini mode** — minimize the window (or click the mini button) and Jarvis becomes a transparent, always-on-top orb with HUD rings and live captions that you can drag anywhere.
-- 🔌 **Any model** — switch to any OpenRouter model with tool calling by changing one line.
+- 🔌 **Any model** — Claude by default; switch to any OpenRouter model with tool calling (including free ones) with one line.
 
 ## How it works
 
