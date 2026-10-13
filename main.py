@@ -34,8 +34,8 @@ class Bridge:
     def send_text(self, text):
         self._app.controller.send_text(text)
 
-    def set_wake_word(self, enabled):
-        self._app.controller.set_wake_word(bool(enabled))
+    def set_mode(self, mode):
+        self._app.controller.set_mode(str(mode), announce=True)
 
     def set_muted(self, muted):
         self._app.controller.set_muted(bool(muted))

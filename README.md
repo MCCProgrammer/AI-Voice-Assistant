@@ -6,7 +6,7 @@ A desktop voice assistant powered by **Claude** (through [OpenRouter](https://op
 
 ## Features
 
-- 🗣️ **Hands-free** — local wake word (“Hey Jarvis”) with [openWakeWord](https://github.com/dscripka/openWakeWord); nothing leaves your computer until you speak to it.
+- 🗣️ **Three listening modes** — **Always on** (just talk; say “stop” to pause, “start listening” to resume), **Hey Jarvis** (local wake word with [openWakeWord](https://github.com/dscripka/openWakeWord)), or **Push to talk** (Space or click the orb). Your choice is remembered.
 - 🧠 **Real conversation** — Claude keeps context, follows up, and decides by itself which tools to use.
 - ⚡ **Low latency** — replies are streamed and spoken sentence by sentence, so it starts talking before it finishes thinking.
 - 🔁 **Natural conversation** — after “Hey Jarvis” it waits for you to think and tolerates pauses mid-sentence. After an action or answer the mic closes; when it asks you a question it keeps listening for your answer until you reply or say “never mind”/“stop”. Background noise and the tail of its own voice are ignored.
@@ -55,9 +55,11 @@ python main.py
 
 The first launch downloads the small wake word model (~5 MB). On macOS, allow microphone access for your terminal when asked.
 
-**Controls:** say “Hey Jarvis”, press <kbd>Space</kbd>, click the mic or the orb to talk · <kbd>Esc</kbd> to stop · or just type. Minimize the window to switch to the floating orb; hover it to expand back or quit.
+**Controls:** pick a listening mode at the top (Always on · Hey Jarvis · Push to talk). Press <kbd>Space</kbd>, click the mic or the orb to talk · <kbd>Esc</kbd> to stop · or just type. Minimize the window to switch to the floating orb; hover it to expand back or quit.
 
-**Wake word not triggering?** Run `python main.py --verbose` and say “Hey Jarvis”: the terminal prints the detection score. If your peaks stay below the threshold (for example with a non-native accent), lower `WAKE_THRESHOLD` in `.env` — try `0.3`.
+**Always on** answers every sentence you say (single words and background noise are ignored), so each sentence is one model request — keep that in mind on a free OpenRouter key, and avoid it with a TV or other people talking nearby.
+
+**Wake word not triggering?** Run `python main.py --verbose` and say “Hey Jarvis”: the terminal prints the detection score. If your peaks stay below the threshold (for example with a non-native accent), lower `WAKE_THRESHOLD` in `.env` — try `0.3` — or switch to **Always on**.
 
 ## Configuration
 

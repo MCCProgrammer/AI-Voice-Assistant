@@ -6,6 +6,7 @@ const api = () => window.pywebview?.api;
 
 const STATUS = {
   idle: 'Ready',
+  ambient: 'Listening for you',
   listening: 'Listening…',
   transcribing: 'Got it…',
   thinking: 'Thinking…',
@@ -18,6 +19,7 @@ const STATUS = {
 
 const PALETTES = {
   idle: [[226, 90, 62], [258, 85, 66], [192, 95, 60]],
+  ambient: [[200, 95, 58], [228, 90, 64], [180, 90, 55]],
   listening: [[190, 100, 60], [210, 100, 62], [172, 90, 55]],
   transcribing: [[250, 90, 66], [280, 85, 64], [210, 95, 62]],
   thinking: [[265, 90, 66], [295, 80, 62], [225, 95, 64]],
@@ -49,7 +51,7 @@ const orb = {
 
     // Ease level and colors towards their targets.
     const active = this.state === 'listening' || this.state === 'speaking';
-    const goal = active ? this.target : 0;
+    const goal = active ? this.target : this.state === 'ambient' ? this.target * 0.4 : 0;
     this.level += (goal - this.level) * (goal > this.level ? 0.35 : 0.08);
     const palette = PALETTES[this.state] || PALETTES.idle;
     this.colors.forEach((col, i) => col.forEach((v, j) => { col[j] += (palette[i][j] - v) * 0.05; }));
@@ -185,7 +187,7 @@ function chime(up = true) {
 const messages = $('messages');
 let current = null;   // assistant bubble being streamed
 let toolsRow = null;  // chips of tools used in the current reply
-let info = { name: 'Jarvis', wakeWord: true, wakeReady: false, muted: false, hasKey: true };
+let info = { name: 'Jarvis', mode: 'wake', wakeReady: false, muted: false, hasKey: true };
 let state = 'idle';
 
 function scrollDown() { messages.scrollTop = messages.scrollHeight; }
@@ -262,8 +264,10 @@ function fadeCaption(delay = 7000) {
 
 function renderHint() {
   const hint = $('hint');
-  if (state === 'idle') {
-    const wake = info.wakeWord && info.wakeReady ? `Say “Hey ${info.name}” or press ` : 'Press ';
+  if (state === 'ambient') {
+    hint.innerHTML = 'Just talk — say “stop” to pause';
+  } else if (state === 'idle') {
+    const wake = info.mode === 'wake' && info.wakeReady ? `Say “Hey ${info.name}” or press ` : 'Press ';
     hint.innerHTML = `${wake}<kbd>Space</kbd>`;
   } else if (state === 'listening') {
     hint.innerHTML = followUp ? 'Answer when you’re ready — or say “never mind”' : 'Take your time — I’ll wait for you to finish';
@@ -281,12 +285,14 @@ function setState(next, extra = {}) {
   followUp = next === 'listening' && !!extra.followUp;
   orb.setState(next);
   $('status').textContent = followUp ? 'Waiting for your answer…' : (STATUS[next] || next);
-  $('micBtn').classList.toggle('active', next !== 'idle');
+  $('micBtn').classList.toggle('active', next !== 'idle' && next !== 'ambient');
   $('miniStatus').textContent = next === 'idle'
-    ? (info.wakeWord && info.wakeReady ? `Say “Hey ${info.name}”` : 'Tap the orb to talk')
+    ? (info.mode === 'wake' && info.wakeReady ? `Say “Hey ${info.name}”` : 'Tap the orb to talk')
     : (followUp ? 'Your answer' : (STATUS[next] || next).replace('…', ''));
-  if (next === 'idle') fadeCaption();
+  if (next === 'ambient') $('miniStatus').textContent = 'Always listening';
+  if (next === 'idle' || next === 'ambient') fadeCaption();
   if (next !== 'thinking') $('tool').hidden = true;
+  document.body.classList.toggle('always-on', next === 'ambient');
   renderHint();
 }
 
@@ -295,8 +301,10 @@ function applyInfo(next) {
   $('name').textContent = info.name;
   document.title = info.name;
   $('model').textContent = info.model || '';
-  $('wakeBtn').classList.toggle('on', info.wakeWord);
-  $('wakeBtn').title = `Listen for “Hey ${info.name}”`;
+  document.querySelectorAll('.modes button').forEach((b) => {
+    b.classList.toggle('on', b.dataset.mode === info.mode);
+    b.setAttribute('aria-checked', String(b.dataset.mode === info.mode));
+  });
   $('muteBtn').classList.toggle('on', !info.muted);
   if (next.reminders) renderReminders(info.reminders);
   if (next.shortcuts) renderSkills(info.shortcuts);
@@ -386,7 +394,7 @@ window.ui = {
 // ---------- Actions ----------
 
 function talk() {
-  if (state === 'idle') api()?.listen();
+  if (state === 'idle' || state === 'ambient') api()?.listen();
   else api()?.stop();
 }
 
@@ -453,7 +461,7 @@ function renderSkills(shortcuts = {}) {
   const tips = h('div', { class: 'tips' },
     h('strong', {}, '🎙️ Talking to me'),
     h('ul', {},
-      h('li', {}, `Say “Hey ${info.name}”, press Space or click the orb.`),
+      h('li', {}, `Pick how I listen at the top: Always on (just talk, say “stop” to pause), “Hey ${info.name}”, or Push to talk (Space or click the orb).`),
       h('li', {}, `Take your time: I wait up to ${info.listenSeconds || 10} seconds for you to start, and you can pause mid-sentence.`),
       h('li', {}, 'When I ask you something, the mic stays open for your answer — say “never mind” or “stop” to cancel.'),
       h('li', {}, 'Misheard? Click your message to fix it and resend.')));
@@ -485,10 +493,10 @@ messages.addEventListener('click', (e) => {
   const button = e.target.closest('.suggestions button');
   if (button) send(button.textContent);
 });
-$('wakeBtn').addEventListener('click', () => {
-  applyInfo({ wakeWord: !info.wakeWord });
-  api()?.set_wake_word(info.wakeWord);
-});
+document.querySelectorAll('.modes button').forEach((b) => b.addEventListener('click', () => {
+  applyInfo({ mode: b.dataset.mode });
+  api()?.set_mode(b.dataset.mode);
+}));
 $('muteBtn').addEventListener('click', () => {
   applyInfo({ muted: !info.muted });
   api()?.set_muted(info.muted);

@@ -19,6 +19,7 @@ class Memory:
         self._data.setdefault("notes", [])
         self._data.setdefault("reminders", [])
         self._data.setdefault("shortcuts", {})
+        self._data.setdefault("settings", {})
         self.on_change: Callable[[], None] | None = None  # e.g. refresh the reminders list in the UI
 
     def _save(self) -> None:
@@ -100,6 +101,16 @@ class Memory:
             self._data["reminders"] = [r for r in self._data["reminders"] if r["id"] not in ids]
             self._save()
             return removed
+
+    # ---------- Settings chosen in the app ----------
+
+    def setting(self, key: str, default=None):
+        return self._data["settings"].get(key, default)
+
+    def set_setting(self, key: str, value) -> None:
+        with self._lock:
+            self._data["settings"][key] = value
+            self._save()
 
     # ---------- Shortcuts ----------
 

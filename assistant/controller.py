@@ -25,6 +25,12 @@ log = logging.getLogger(__name__)
 END_PHRASES = re.compile(
     r"^(ok(ay)?,? )?(stop|cancel|never ?mind|forget it|that'?s (all|it)|nothing|no,? thanks?( you)?|bye|goodbye|"
     r"thanks?( you)?,? (that'?s all|bye))[.!]*$", re.I)
+# In "always on" mode these pause listening; any of them turns it (back) on.
+PAUSE_PHRASES = re.compile(r"^(ok(ay)?,? )?(stop|stop listening|pause|pause listening|go to sleep|be quiet|"
+                           r"never ?mind|that'?s (all|it)|bye|goodbye)[.!]*$", re.I)
+RESUME_PHRASES = re.compile(r"\b(start listening|always listen(ing)?|keep listening|listen to me)\b", re.I)
+MODES = ("wake", "always", "manual")  # "Hey Jarvis" · always listening · push to talk only
+
 # Sounds that speech-to-text sometimes returns for noise; ignored while waiting for an answer.
 FILLERS = {"uh", "um", "umm", "hmm", "mm", "mhm", "ah", "oh", "er", "erm", "huh", "the", "a"}
 
@@ -55,13 +61,17 @@ class Controller:
         self.mic = Microphone()
         self.speaker = Speaker(on_level=lambda level: self._emit("level", value=level, source="speaker"))
         self.wake: WakeWord | None = None
-        self.wake_enabled = cfg.wake_word
+        self.mode = self.memory.setting("mode") or ("wake" if cfg.wake_word else "manual")
+        self.mic_ready = False
         self.muted = False
         self.state = "idle"
         self._cancel = threading.Event()
         self._busy = threading.Lock()
         self._last_level = 0.0
         self._started = False
+        self._ambient_cancel = threading.Event()  # interrupts the always-on recording
+        self._turn_ended = 0.0
+        self._awaiting_answer = False  # the last reply asked the user something
         # UI updates go through their own thread: evaluate_js waits for the page, and doing that on
         # the microphone thread made it drop audio frames (and miss the wake word).
         self._events: queue.Queue[dict] = queue.Queue()
@@ -109,7 +119,7 @@ class Controller:
             "name": self.cfg.name,
             "model": self.cfg.model,
             "hasKey": bool(self.cfg.api_key),
-            "wakeWord": self.wake_enabled,
+            "mode": self.mode,
             "wakeReady": self.wake is not None,
             "muted": self.muted,
             "state": self.state,
@@ -132,8 +142,11 @@ class Controller:
             log.exception("microphone unavailable")
             self._emit("error", message=f"Microphone unavailable: {error}. You can still type.")
             return
+        self.mic_ready = True
         self.mic.subscribe(self._on_frame)
         threading.Thread(target=self._load_wake_word, daemon=True).start()
+        threading.Thread(target=self._ambient_loop, name="always-on", daemon=True).start()
+        self._set_state(self._rest_state())
         threading.Thread(target=self._reminder_loop, name="reminders", daemon=True).start()
 
     def _load_wake_word(self) -> None:
@@ -145,9 +158,9 @@ class Controller:
             self._emit("toast", message=f"Wake word unavailable ({error}). Use the mic button or Space.")
 
     def _on_frame(self, frame) -> None:
-        if self.state == "idle" and self.wake_enabled and self.wake and self.wake.heard(frame):
+        if self.state == "idle" and self.mode == "wake" and self.wake and self.wake.heard(frame):
             self.listen()
-        if self.state in ("idle", "listening"):
+        if self.state in ("idle", "listening", "ambient"):
             level = min(1.0, rms(frame) / 4000)
             # Throttle UI updates a little and skip near-silence repeats.
             if abs(level - self._last_level) > 0.01 or level > 0.02:
@@ -172,10 +185,27 @@ class Controller:
         self._cancel.set()
         self.speaker.stop()
 
-    def set_wake_word(self, enabled: bool) -> None:
-        self.wake_enabled = enabled
+    def set_mode(self, mode: str, announce: bool = False) -> None:
+        """Switches between "wake" (Hey Jarvis), "always" (always listening) and "manual" (push to talk)."""
+        if mode not in MODES:
+            return
+        self.mode = mode
+        self.memory.set_setting("mode", mode)
+        self._ambient_cancel.set()  # restart or stop the always-on recording
         if self.wake:
             self.wake.reset()
+        if self.state in ("idle", "ambient"):
+            self._set_state(self._rest_state())
+        self._emit("info", **self.info())
+        if announce:
+            self._emit("toast", message={
+                "always": "Always listening — just talk. Say “stop” to pause.",
+                "wake": f"Paused. Say “Hey {self.cfg.name}, start listening” or click Always on.",
+                "manual": "Push to talk: press Space or click the orb.",
+            }[mode])
+
+    def _rest_state(self) -> str:
+        return "ambient" if self.mode == "always" and self.mic_ready else "idle"
 
     def set_muted(self, muted: bool) -> None:
         self.muted = muted
@@ -193,6 +223,7 @@ class Controller:
         if not self._busy.acquire(blocking=False):
             return
         self._cancel.clear()
+        self._ambient_cancel.set()  # the always-on loop must not record this turn (or our own voice)
         follow_up = False
         misses = 0
         try:
@@ -209,6 +240,9 @@ class Controller:
                         continue
                     misses = 0
                 self._emit("user", text=text)
+                if voice and RESUME_PHRASES.search(text):
+                    self.set_mode("always", announce=True)
+                    break
                 if voice and END_PHRASES.match(text.strip()):
                     self._emit("toast", message="Okay — I'm here if you need me 👋")
                     break
@@ -221,10 +255,55 @@ class Controller:
             self._emit("error", message=self._describe(error))
         finally:
             self.speaker.stop()
-            self._set_state("idle")
+            self._turn_ended = time.monotonic()
+            self._set_state(self._rest_state())
             if self.wake:
                 self.wake.reset()
             self._busy.release()
+
+    # ---------- Always-on listening ----------
+
+    def _ambient_loop(self) -> None:
+        """In "always" mode: every sentence the user says is answered, until they say "stop"."""
+        while True:
+            if not self.speaker.idle.is_set():
+                self._turn_ended = time.monotonic()  # e.g. a reminder is being read out
+            if self.mode != "always" or self._busy.locked() or time.monotonic() - self._turn_ended < 0.7:
+                time.sleep(0.2)  # paused, busy with a turn, or letting our own voice die out
+                continue
+            self._ambient_cancel.clear()
+            if self.state not in ("ambient", "listening"):
+                self._set_state("ambient")
+            pcm = record_utterance(
+                self.mic, self._ambient_cancel, start_timeout=60.0, silence_after=self.cfg.pause_seconds,
+                max_seconds=45.0, min_speech=0.5, sensitivity=3.5,
+                on_voice=lambda speaking: self._set_state("listening" if speaking else "ambient"))
+            if not pcm or self.mode != "always" or not self._busy.acquire(blocking=False):
+                if self.state == "listening" and not self._busy.locked():
+                    self._set_state(self._rest_state())
+                continue
+            try:
+                self._cancel.clear()
+                self._set_state("transcribing")
+                text = transcribe(pcm, self.cfg, self.client).strip()
+                if not text or text.lower().strip(".!?") in FILLERS:
+                    continue
+                if PAUSE_PHRASES.match(text):
+                    self._emit("user", text=text)
+                    self.set_mode("wake" if self.wake else "manual", announce=True)
+                    continue
+                if len(text.split()) < 2 and not self._awaiting_answer:
+                    continue  # single words are usually noise, unless they answer a question ("yes", "Lisbon")
+                self._emit("user", text=text)
+                self._awaiting_answer = asks_question(self._respond(text))
+            except Exception as error:
+                log.exception("always-on turn failed")
+                self._emit("error", message=self._describe(error))
+            finally:
+                self.speaker.stop()
+                self._turn_ended = time.monotonic()
+                self._set_state(self._rest_state())
+                self._busy.release()
 
     def _hear(self, follow_up: bool) -> str | None:
         """Returns what was said, "" if it couldn't be understood, or None if nobody spoke."""
@@ -323,6 +402,7 @@ class Controller:
         if not self.muted and not self._busy.locked():
             pcm = synthesize(spoken, self.cfg.voice)
             if pcm is not None:
+                self._ambient_cancel.set()  # don't let always-on listening hear the alert
                 self.speaker.play(pcm)
                 self.speaker.finish()
 

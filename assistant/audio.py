@@ -86,12 +86,14 @@ def record_utterance(
     silence_after: float = 0.9,
     min_speech: float = 0.3,
     sensitivity: float = 3.0,
+    on_voice: Callable[[bool], None] | None = None,
 ) -> bytes | None:
     """Records one spoken phrase and returns 16 kHz mono PCM, or None if nobody spoke.
 
     Short blips (a click, a cough, the tail of the assistant's own voice) shorter than `min_speech`
     seconds of actual voice are thrown away and it keeps waiting, so they never reach speech-to-text.
     `sensitivity` is how many times louder than the room's background noise counts as voice.
+    `on_voice(True)` is called when voice starts and `on_voice(False)` when it turns out to be a blip.
     """
     frames: queue.Queue[np.ndarray] = queue.Queue()
     unsubscribe = mic.subscribe(frames.put)
@@ -112,6 +114,8 @@ def record_utterance(
                 if loud:
                     recorded.extend(preroll)
                     voiced, silent, length = frame_seconds, 0.0, 0.0
+                    if on_voice:
+                        on_voice(True)
                 elif waited >= start_timeout:
                     return None
                 continue
@@ -128,6 +132,8 @@ def record_utterance(
                 waited += length  # just a blip: forget it and keep waiting
                 recorded = []
                 preroll.clear()
+                if on_voice:
+                    on_voice(False)
     finally:
         unsubscribe()
     if cancel.is_set() or not recorded:
