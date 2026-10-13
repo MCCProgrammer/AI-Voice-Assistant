@@ -9,7 +9,7 @@ A desktop voice assistant powered by **Claude** (through [OpenRouter](https://op
 - 🗣️ **Hands-free** — local wake word (“Hey Jarvis”) with [openWakeWord](https://github.com/dscripka/openWakeWord); nothing leaves your computer until you speak to it.
 - 🧠 **Real conversation** — Claude keeps context, follows up, and decides by itself which tools to use.
 - ⚡ **Low latency** — replies are streamed and spoken sentence by sentence, so it starts talking before it finishes thinking.
-- 🔁 **Natural conversation** — after “Hey Jarvis” it waits for you to think, tolerates pauses mid-sentence, and keeps listening after each answer until you go quiet or say “stop”.
+- 🔁 **Natural conversation** — after “Hey Jarvis” it waits for you to think and tolerates pauses mid-sentence. After an action or answer the mic closes; when it asks you a question it keeps listening for your answer until you reply or say “never mind”/“stop”. Background noise and the tail of its own voice are ignored.
 - 🔔 **Reminders** — “remind me to call mum tomorrow at 6pm” is saved to disk, listed in the Reminders tab, and announced with a spoken alert and a system notification, even after a restart.
 - 📂 **Your computer** — “open my Downloads folder”, any folder by name, apps, volume, battery, plus named **shortcuts** (“open my GitHub repositories”) you can create by voice.
 - 🧭 **“What I can do” tab** listing every skill with example phrases you can click to try.
@@ -71,7 +71,7 @@ Everything lives in `.env`:
 | `VOICE` | `en-GB-RyanNeural` | Reply voice — list them with `edge-tts --list-voices` |
 | `LANGUAGE` | `en-US` | Language you speak (e.g. `pt-PT`) |
 | `WAKE_WORD` | `on` | Listen for “Hey Jarvis” |
-| `LISTEN_SECONDS` | `10` | How long it waits for you to start talking (after the wake word and between turns) |
+| `LISTEN_SECONDS` | `10` | How long it waits for you to start talking after the wake word (doubled when it is waiting for the answer to a question) |
 | `PAUSE_SECONDS` | `1.5` | How long you can pause mid-sentence before it answers |
 | `WAKE_THRESHOLD` | `0.4` | Lower = more sensitive wake word. Run with `--verbose` to see your scores |
 | `STT` | `google` | `google` (free) or `openrouter` (uses `STT_MODEL`) |

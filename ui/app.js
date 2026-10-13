@@ -266,7 +266,7 @@ function renderHint() {
     const wake = info.wakeWord && info.wakeReady ? `Say “Hey ${info.name}” or press ` : 'Press ';
     hint.innerHTML = `${wake}<kbd>Space</kbd>`;
   } else if (state === 'listening') {
-    hint.innerHTML = followUp ? 'Keep talking, or say “stop” to finish' : 'Take your time — I’ll wait for you to finish';
+    hint.innerHTML = followUp ? 'Answer when you’re ready — or say “never mind”' : 'Take your time — I’ll wait for you to finish';
   } else if (state === 'speaking' || state === 'thinking') {
     hint.innerHTML = '<kbd>Esc</kbd> to stop';
   } else {
@@ -280,11 +280,11 @@ function setState(next, extra = {}) {
   state = next;
   followUp = next === 'listening' && !!extra.followUp;
   orb.setState(next);
-  $('status').textContent = followUp ? 'Still listening…' : (STATUS[next] || next);
+  $('status').textContent = followUp ? 'Waiting for your answer…' : (STATUS[next] || next);
   $('micBtn').classList.toggle('active', next !== 'idle');
   $('miniStatus').textContent = next === 'idle'
     ? (info.wakeWord && info.wakeReady ? `Say “Hey ${info.name}”` : 'Tap the orb to talk')
-    : (followUp ? 'Still listening' : (STATUS[next] || next).replace('…', ''));
+    : (followUp ? 'Your answer' : (STATUS[next] || next).replace('…', ''));
   if (next === 'idle') fadeCaption();
   if (next !== 'thinking') $('tool').hidden = true;
   renderHint();
@@ -455,7 +455,7 @@ function renderSkills(shortcuts = {}) {
     h('ul', {},
       h('li', {}, `Say “Hey ${info.name}”, press Space or click the orb.`),
       h('li', {}, `Take your time: I wait up to ${info.listenSeconds || 10} seconds for you to start, and you can pause mid-sentence.`),
-      h('li', {}, 'In a conversation I keep listening after each answer — say “stop” or “that’s all” to finish.'),
+      h('li', {}, 'When I ask you something, the mic stays open for your answer — say “never mind” or “stop” to cancel.'),
       h('li', {}, 'Misheard? Click your message to fix it and resend.')));
   const entries = Object.entries(shortcuts);
   const saved = entries.length ? h('div', { class: 'skill' },

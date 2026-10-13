@@ -84,37 +84,53 @@ def record_utterance(
     start_timeout: float = 6.0,
     max_seconds: float = 15.0,
     silence_after: float = 0.9,
+    min_speech: float = 0.3,
+    sensitivity: float = 3.0,
 ) -> bytes | None:
-    """Records one spoken phrase and returns 16 kHz mono PCM, or None if nobody spoke."""
+    """Records one spoken phrase and returns 16 kHz mono PCM, or None if nobody spoke.
+
+    Short blips (a click, a cough, the tail of the assistant's own voice) shorter than `min_speech`
+    seconds of actual voice are thrown away and it keeps waiting, so they never reach speech-to-text.
+    `sensitivity` is how many times louder than the room's background noise counts as voice.
+    """
     frames: queue.Queue[np.ndarray] = queue.Queue()
     unsubscribe = mic.subscribe(frames.put)
     preroll: deque[np.ndarray] = deque(maxlen=4)  # keep ~300 ms before speech starts
     recorded: list[np.ndarray] = []
     frame_seconds = BLOCK / RATE
-    waited = silent = spoken = 0.0
+    waited = voiced = silent = length = 0.0
     try:
         while not cancel.is_set():
             try:
                 frame = frames.get(timeout=0.5)
             except queue.Empty:
                 continue
-            loud = rms(frame) > max(mic.noise_floor * 3.0, 350.0)
+            loud = rms(frame) > max(mic.noise_floor * sensitivity, 350.0)
             if not recorded:
                 preroll.append(frame)
                 waited += frame_seconds
                 if loud:
                     recorded.extend(preroll)
+                    voiced, silent, length = frame_seconds, 0.0, 0.0
                 elif waited >= start_timeout:
                     return None
                 continue
             recorded.append(frame)
-            spoken += frame_seconds
-            silent = 0.0 if loud else silent + frame_seconds
-            if silent >= silence_after or spoken >= max_seconds:
-                break
+            length += frame_seconds
+            if loud:
+                voiced += frame_seconds
+                silent = 0.0
+            else:
+                silent += frame_seconds
+            if silent >= silence_after or length >= max_seconds:
+                if voiced >= min_speech:
+                    break
+                waited += length  # just a blip: forget it and keep waiting
+                recorded = []
+                preroll.clear()
     finally:
         unsubscribe()
-    if cancel.is_set() or spoken < 0.3:
+    if cancel.is_set() or not recorded:
         return None
     return np.concatenate(recorded).tobytes()
 

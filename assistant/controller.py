@@ -21,10 +21,17 @@ from .tools import ToolBox
 
 log = logging.getLogger(__name__)
 
-# Saying one of these during a conversation ends it without asking the model.
+# Saying one of these ends the conversation without asking the model.
 END_PHRASES = re.compile(
-    r"^(ok(ay)?,? )?(stop|cancel|never ?mind|that'?s (all|it)|nothing|no,? thanks?( you)?|bye|goodbye|"
+    r"^(ok(ay)?,? )?(stop|cancel|never ?mind|forget it|that'?s (all|it)|nothing|no,? thanks?( you)?|bye|goodbye|"
     r"thanks?( you)?,? (that'?s all|bye))[.!]*$", re.I)
+# Sounds that speech-to-text sometimes returns for noise; ignored while waiting for an answer.
+FILLERS = {"uh", "um", "umm", "hmm", "mm", "mhm", "ah", "oh", "er", "erm", "huh", "the", "a"}
+
+
+def asks_question(reply: str) -> bool:
+    """Whether the assistant ended its reply with a question, so the user is expected to answer."""
+    return reply.strip().rstrip("\"'”’)] ").endswith("?")
 
 TOOL_LABELS = {
     "get_datetime": "Checking the time", "get_weather": "Checking the weather", "web_search": "Searching the web",
@@ -181,7 +188,8 @@ class Controller:
     # ---------- Conversation loop ----------
 
     def _conversation(self, voice: bool, text: str | None = None) -> None:
-        """One exchange when typing; when talking, keeps listening for replies until silence or "stop"."""
+        """One exchange. When talking, the mic stays open only if the assistant asked a question:
+        then it waits for the answer until the user speaks, says "never mind"/"stop", or stays quiet."""
         if not self._busy.acquire(blocking=False):
             return
         self._cancel.clear()
@@ -193,20 +201,21 @@ class Controller:
                     text = self._hear(follow_up)
                     if text is None:  # nobody spoke
                         break
-                    if not text:  # spoke but unintelligible: try again, up to twice
+                    if not text or text.strip().lower().strip(".!?") in FILLERS:
+                        # Noise or unintelligible: when waiting for an answer, keep listening quietly.
                         misses += 1
-                        if misses > 2:
+                        if misses > (3 if follow_up else 1):
                             break
                         continue
                     misses = 0
                 self._emit("user", text=text)
-                if voice and follow_up and END_PHRASES.match(text.strip()):
+                if voice and END_PHRASES.match(text.strip()):
                     self._emit("toast", message="Okay — I'm here if you need me 👋")
                     break
-                self._respond(text)
-                if not voice or self._cancel.is_set():
-                    break
-                follow_up = True  # keep listening for a reply without the wake word
+                reply = self._respond(text)
+                if not voice or self._cancel.is_set() or not asks_question(reply):
+                    break  # an action or a plain answer: done, the mic closes
+                follow_up = True
         except Exception as error:
             log.exception("conversation failed")
             self._emit("error", message=self._describe(error))
@@ -219,21 +228,30 @@ class Controller:
 
     def _hear(self, follow_up: bool) -> str | None:
         """Returns what was said, "" if it couldn't be understood, or None if nobody spoke."""
+        if follow_up:
+            time.sleep(0.5)  # let the tail of our own voice die out before listening
         self._set_state("listening", followUp=follow_up)
-        pcm = record_utterance(self.mic, self._cancel, start_timeout=self.cfg.listen_seconds,
-                               silence_after=self.cfg.pause_seconds, max_seconds=45.0)
+        pcm = record_utterance(
+            self.mic, self._cancel,
+            start_timeout=self.cfg.listen_seconds * (2 if follow_up else 1),
+            silence_after=self.cfg.pause_seconds,
+            max_seconds=45.0,
+            min_speech=0.6 if follow_up else 0.4,
+            sensitivity=4.0 if follow_up else 3.0,
+        )
         if not pcm:
             return None
         self._set_state("transcribing")
         text = transcribe(pcm, self.cfg, self.client)
-        if not text:
+        if not text and not follow_up:
             self._emit("toast", message="Sorry, I didn't catch that — say it again.")
         return text
 
-    def _respond(self, text: str) -> None:
+    def _respond(self, text: str) -> str:
+        """Asks the model, shows and speaks the reply as it streams; returns the full reply."""
         if not self.cfg.api_key:
             self._emit("error", message="Add your OPENROUTER_API_KEY to the .env file and restart.")
-            return
+            return ""
         self._set_state("thinking")
         self._emit("assistant_start")
         sentences: queue.Queue[str | None] = queue.Queue()
@@ -252,7 +270,7 @@ class Controller:
             self._emit("tool", name=name, label=TOOL_LABELS.get(name, name), args=args)
 
         try:
-            self.brain.reply(text, self._cancel, on_text, on_tool,
+            reply = self.brain.reply(text, self._cancel, on_text, on_tool,
                              on_card=lambda name, card: self._emit("card", tool=name, card=card))
         finally:
             for sentence in splitter.flush():
@@ -264,6 +282,7 @@ class Controller:
         while not self.speaker.idle.wait(0.1):
             if self._cancel.is_set():
                 break
+        return reply
 
     def _voice_worker(self, sentences: "queue.Queue[str | None]") -> None:
         spoke = False
