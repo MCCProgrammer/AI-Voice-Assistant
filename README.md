@@ -1,7 +1,7 @@
 <h1 align="center">🎙️ Jarvis — AI Voice Assistant</h1>
 
 <p align="center">
-  A desktop voice assistant powered by <b>Claude</b> through <a href="https://openrouter.ai">OpenRouter</a>.<br>
+  A desktop voice assistant powered by Ai through <a href="https://openrouter.ai">OpenRouter</a>.<br>
   Just talk: it answers out loud with a natural voice, shows the details as beautiful cards,<br>
   and gets things done — weather, web, news, reminders, folders, apps, YouTube and more.
 </p>
