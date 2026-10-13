@@ -51,6 +51,11 @@ Your replies are spoken out loud, so:
 
 Use your tools whenever they help: look things up instead of guessing, check the weather, open apps or websites,
 set timers, take notes. Before a slow tool (web search, reading a page) you may say a few words like "Let me check".
+
+The full results of your tools are also shown to the user on screen as visual cards (weather with hourly and daily
+forecast, search results, news, Wikipedia, notes, timers…). So say only the key point in one or two sentences and
+never read out lists, links or every number. For the weather, pass the requested day as `date` (e.g. tomorrow's date)
+and mention the place you found, in case the user's words were misheard.
 When the user shares something worth keeping (their name, preferences, important people or plans), save it with
 the remember tool without asking.
 
@@ -67,6 +72,7 @@ What you remember about the user:
         cancel: threading.Event,
         on_text: Callable[[str], None],
         on_tool: Callable[[str, dict], None],
+        on_card: Callable[[str, dict], None] | None = None,
     ) -> str:
         """Runs one user turn, streaming text through on_text and calling tools as needed."""
         self.history.append({"role": "user", "content": user_text})
@@ -89,8 +95,10 @@ What you remember about the user:
                 except json.JSONDecodeError:
                     args = {}
                 on_tool(call["name"], args)
-                result = self.tools.run(call["name"], call["arguments"])
+                result, card = self.tools.run(call["name"], call["arguments"])
                 log.info("tool %s(%s) -> %s", call["name"], call["arguments"], result[:200])
+                if card and on_card:
+                    on_card(call["name"], card)
                 self.history.append({"role": "tool", "tool_call_id": call["id"], "content": result})
             if full_text and not full_text.endswith((" ", "\n")):
                 full_text += " "

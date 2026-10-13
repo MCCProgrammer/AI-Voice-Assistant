@@ -11,6 +11,7 @@ A desktop voice assistant powered by **Claude** (through [OpenRouter](https://op
 - ⚡ **Low latency** — replies are streamed and spoken sentence by sentence, so it starts talking before it finishes thinking.
 - 🔁 **Follow-ups without the wake word** — after answering it keeps listening for a few seconds.
 - 🛠️ **17 tools** — web search, news, reading web pages, Wikipedia, weather, YouTube, opening apps and websites, volume, battery/CPU, timers, notes and long-term memory.
+- 🃏 **Visual cards** — it speaks the short answer and shows the details: weather with an hourly chart and 7-day forecast (plus “not the right place?” suggestions if it misheard), web results, news with images, Wikipedia, YouTube, notes, live timers and system gauges. Click your own message to fix a misheard question and resend it.
 - 💾 **Memory** — tell it your name or preferences and it remembers them across sessions.
 - 🎨 **Animated orb** that reacts to your voice and to its own, with a live transcript, tool activity and a text box for when you'd rather type.
 - 🪐 **Floating mini mode** — minimize the window (or click the mini button) and Jarvis becomes a transparent, always-on-top orb with HUD rings and live captions that you can drag anywhere.

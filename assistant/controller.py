@@ -223,7 +223,8 @@ class Controller:
             self._emit("tool", name=name, label=TOOL_LABELS.get(name, name), args=args)
 
         try:
-            self.brain.reply(text, self._cancel, on_text, on_tool)
+            self.brain.reply(text, self._cancel, on_text, on_tool,
+                             on_card=lambda name, card: self._emit("card", tool=name, card=card))
         finally:
             for sentence in splitter.flush():
                 sentences.put(sentence)

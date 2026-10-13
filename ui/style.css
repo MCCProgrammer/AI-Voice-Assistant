@@ -209,7 +209,7 @@ body:not(.ready) { opacity: 0; }
 html:has(body.mini), body.mini { background: transparent; color-scheme: normal; }
 body.mini .topbar, body.mini .chat, body.mini .status, body.mini .toasts { display: none !important; }
 body.mini .stage { display: block; height: 100%; }
-body.mini .orb-area { height: 100%; justify-content: flex-start; padding-top: 8px; }
+body.mini .orb-area { justify-content: flex-start; padding-top: 8px; }
 body.mini #orb { width: 250px; cursor: pointer; }
 body.mini .mini-hud { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; margin-top: -6px; padding: 0 16px; }
 
@@ -266,3 +266,135 @@ body.mini:hover .mini-controls { opacity: 1; }
 .caption.show { opacity: 1; transform: none; }
 .caption.user { color: #a9bce0; font-style: italic; }
 .caption.error { color: #ffc2cd; border-color: #ff5c7a55; }
+
+/* ---------- Cards (tool results) ---------- */
+.card {
+  align-self: stretch;
+  padding: 14px;
+  background: linear-gradient(180deg, #121726, #0d111c);
+  border: 1px solid #263049;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px -18px #000, inset 0 1px 0 #ffffff0a;
+  animation: rise .25s ease-out both;
+  user-select: none;
+}
+.card button { font: inherit; color: inherit; background: none; border: 0; padding: 0; text-align: left; }
+.card .muted { color: var(--muted); font-size: 12px; }
+.card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.card-icon { font-size: 18px; line-height: 1; }
+.card-title { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.card-title strong { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-kicker { font: 600 10px/1.4 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: .14em; text-transform: uppercase; color: #7fe7ff; }
+.heard {
+  margin-left: auto;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: #ffd38a;
+  background: #ffb35c14;
+  border: 1px solid #ffb35c44;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+
+/* Weather */
+.wx-hero { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; align-items: center; }
+.wx-icon { font-size: 44px; line-height: 1; filter: drop-shadow(0 4px 14px #ffb35c55); }
+.wx-day { font-size: 12px; color: var(--muted); }
+.wx-temp { font-size: 34px; font-weight: 600; letter-spacing: -.02em; line-height: 1.1; }
+.wx-temp span { font-size: 15px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+.wx-cond { font-size: 13px; color: #cfd8ea; }
+.wx-stats { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.wx-stats span { padding: 3px 9px; font-size: 11.5px; color: #cfd8ea; background: #ffffff08; border: 1px solid #ffffff10; border-radius: 99px; }
+.wx-chart { display: block; width: 100%; height: auto; margin: 10px 0 4px; }
+.wx-chart text { font: 10px -apple-system, sans-serif; text-anchor: middle; }
+.wx-chart .t { fill: #ffd9ad; font-weight: 600; }
+.wx-chart .l { fill: var(--faint); }
+.wx-days { display: grid; grid-template-columns: repeat(auto-fit, minmax(42px, 1fr)); gap: 4px; margin-top: 6px; }
+.wx-days button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 6px 2px;
+  border: 1px solid transparent !important;
+  border-radius: 10px;
+  transition: background .15s;
+}
+.wx-days button:hover { background: #ffffff08; }
+.wx-days button.active { background: #5b8cff1f; border-color: #5b8cff66 !important; }
+.wx-days .d { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+.wx-days .i { font-size: 18px; }
+.wx-days .hi { font-size: 12.5px; font-weight: 600; }
+.wx-days .lo { font-size: 11px; color: var(--faint); }
+.wx-days .r { font-size: 10px; color: #8fb2ff; min-height: 13px; }
+.alts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #ffffff0d; }
+.alts button { padding: 3px 10px !important; font-size: 11.5px; color: #c9d6ff; background: #5b8cff14 !important; border: 1px solid #5b8cff40 !important; border-radius: 99px; }
+.alts button:hover { background: #5b8cff2a !important; }
+
+/* Lists (search, news, page) */
+.list { display: flex; flex-direction: column; gap: 2px; }
+.card .row { display: flex; gap: 10px; align-items: flex-start; width: 100%; padding: 8px; border-radius: 10px; cursor: pointer; }
+.card .row:hover { background: #ffffff08; }
+.fav { flex: none; width: 18px; height: 18px; margin-top: 2px; border-radius: 4px; background: #ffffff10; }
+.thumb { flex: none; width: 64px; height: 44px; object-fit: cover; border-radius: 8px; background: #ffffff10; }
+.num { flex: none; width: 20px; font: 600 12px ui-monospace, Menlo, monospace; color: var(--faint); padding-top: 1px; }
+.row-text { min-width: 0; }
+.row-title { font-size: 13px; font-weight: 500; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.row-meta { margin-top: 2px; font-size: 11px; color: #7fa3ff; }
+.row-snippet { margin-top: 3px; font-size: 12px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card.page { padding: 6px; }
+
+/* Wikipedia */
+.wiki-body { display: flex; gap: 14px; align-items: flex-start; }
+.wiki-img { flex: none; width: 92px; height: 92px; object-fit: cover; border-radius: 12px; background: #ffffff10; }
+.wiki-title { display: block; margin: 2px 0; font-size: 16px; }
+.wiki-text { margin: 8px 0 0; font-size: 12.5px; color: #cfd8ea; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+.card .link { margin-top: 8px; font-size: 12px; color: #7fa3ff; cursor: pointer; }
+.compact .wiki-text { -webkit-line-clamp: 3; }
+
+/* YouTube */
+.video { padding: 0; overflow: hidden; }
+.video-thumb { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; cursor: pointer; }
+.video-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.video-thumb .play {
+  position: absolute; inset: 0; margin: auto; width: 54px; height: 38px;
+  display: grid; place-items: center; color: #fff; font-size: 16px;
+  background: #ff0033e6; border-radius: 12px; box-shadow: 0 6px 20px #0008;
+}
+.video-title { display: flex; flex-direction: column; gap: 3px; padding: 10px 14px 12px; font-size: 13px; font-weight: 500; }
+
+/* System */
+.gauges { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.gauge { position: relative; display: flex; flex-direction: column; align-items: center; }
+.gauge svg { width: 72px; height: 72px; transform: rotate(-90deg); }
+.gauge circle { fill: none; stroke-width: 6; }
+.gauge .track { stroke: #ffffff12; }
+.gauge .bar { stroke-linecap: round; filter: drop-shadow(0 0 4px currentColor); }
+.gauge-value { position: absolute; top: 25px; font-size: 14px; font-weight: 600; }
+.gauge-label { margin-top: 4px; font-size: 11.5px; color: var(--muted); }
+
+/* Timer */
+.timer-time { font: 600 34px/1.1 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: .04em; color: #eaf2ff; text-shadow: 0 0 18px #5b8cff88; }
+.timer-bar { height: 5px; margin-top: 10px; background: #ffffff10; border-radius: 99px; overflow: hidden; }
+.timer-fill { height: 100%; background: linear-gradient(90deg, var(--cyan), var(--accent-2)); transition: width 1s linear; }
+.timer.done .timer-time { color: #7dffb0; text-shadow: 0 0 18px #3ddc8488; }
+
+/* Notes and memory */
+.notes ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 13px; }
+.notes li.new { color: #7dffb0; }
+.memory, .notfound { display: flex; gap: 12px; align-items: center; font-size: 13px; }
+
+/* Compact cards in the floating mini mode */
+.mini-card:empty { display: none; }
+.mini-card { width: 100%; }
+.mini-card .card { padding: 11px 12px; background: linear-gradient(180deg, #0a0e1af2, #070a12f2); border-color: #5b8cff40; box-shadow: 0 0 24px -8px #5b8cff66; }
+.compact .wx-icon { font-size: 34px; }
+.compact .wx-temp { font-size: 26px; }
+.compact .card-head { margin-bottom: 6px; }
+.compact .row { padding: 5px 4px; }
+.mini-card .timer-time { font-size: 26px; }
+.mini-card .gauge svg { width: 56px; height: 56px; }
+.mini-card .gauge-value { top: 19px; font-size: 12px; }
+.compact .card-head { flex-wrap: wrap; row-gap: 6px; }
+.compact .card-title { flex: 1 0 auto; max-width: calc(100% - 30px); }
+.compact .heard { margin-left: 28px; }

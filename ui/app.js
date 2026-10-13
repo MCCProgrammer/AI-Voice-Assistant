@@ -195,9 +195,36 @@ function addMessage(kind, text) {
   const el = document.createElement('div');
   el.className = `msg ${kind}`;
   el.textContent = text;
+  if (kind === 'user') {
+    // Misheard? Click your message to fix it and send it again.
+    el.title = 'Click to edit and resend';
+    el.addEventListener('click', () => {
+      $('input').value = el.textContent;
+      $('input').focus();
+    });
+  }
   messages.append(el);
   scrollDown();
   return el;
+}
+
+const isMini = () => document.body.classList.contains('mini');
+
+// Resizes the floating window to fit the orb, caption and card.
+function fitMini() {
+  if (!isMini()) return;
+  requestAnimationFrame(() => {
+    const bottom = document.querySelector('.mini-hud').getBoundingClientRect().bottom;
+    api()?.fit_mini(Math.ceil(bottom + 18));
+  });
+}
+
+let cardTimer;
+function showMiniCard(card) {
+  clearTimeout(cardTimer);
+  const el = card ? renderCard(card, true) : null;
+  $('miniCard').replaceChildren(...(el ? [el] : []));
+  fitMini();
 }
 
 function toast(text) {
@@ -229,6 +256,8 @@ function captionAppend(delta) {
 function fadeCaption(delay = 7000) {
   clearTimeout(captionTimer);
   captionTimer = setTimeout(() => $('caption').classList.remove('show'), delay);
+  clearTimeout(cardTimer);
+  cardTimer = setTimeout(() => showMiniCard(null), delay * 3);
 }
 
 function renderHint() {
@@ -284,7 +313,18 @@ window.ui = {
       case 'user':
         addMessage('user', event.text);
         caption(`“${event.text}”`, 'user');
+        showMiniCard(null);
         break;
+      case 'card': {
+        const el = renderCard(event.card);
+        if (el) {
+          messages.querySelector('.empty')?.remove();
+          messages.append(el);
+          scrollDown();
+        }
+        showMiniCard(event.card);
+        break;
+      }
       case 'assistant_start':
         current = null;
         toolsRow = null;

@@ -1,6 +1,7 @@
 """Starts the Jarvis desktop app."""
 import logging
 import sys
+import webbrowser
 
 import webview
 
@@ -41,6 +42,13 @@ class Bridge:
 
     def clear(self):
         self._app.controller.clear()
+
+    def open_url(self, url):
+        if str(url).startswith(("http://", "https://")):
+            webbrowser.open(url)
+
+    def fit_mini(self, height):
+        self._app.fit_mini(int(height))
 
     def mini(self):
         self._app.enter_mini()
@@ -95,6 +103,11 @@ class App:
         else:
             self.mini_window.show()
         self.main_window.hide()
+
+    def fit_mini(self, height: int) -> None:
+        """Grows or shrinks the floating window to fit its content (e.g. when a card appears)."""
+        if self.mini_window is not None:
+            self.mini_window.resize(MINI_SIZE[0], max(MINI_SIZE[1], min(height, 780)))
 
     def exit_mini(self) -> None:
         self.main_window.show()
