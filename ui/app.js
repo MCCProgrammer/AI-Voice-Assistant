@@ -33,6 +33,7 @@ const orb = {
   colors: PALETTES.idle.map((c) => [...c]),
   spin: 0,
   t: 0,
+  hud: false,      // futuristic rings around the orb (mini mode)
 
   setState(state) { this.state = state; },
   setLevel(value) { this.target = Math.max(0, Math.min(1, value)); },
@@ -98,6 +99,8 @@ const orb = {
     ctx.arc(c, c, radius * 0.6, 0, Math.PI * 2);
     ctx.fill();
 
+    if (this.hud) this.drawHud(ctx, c, size);
+
     // Orbiting particles while thinking
     if (thinking) {
       for (let i = 0; i < 14; i++) {
@@ -111,6 +114,47 @@ const orb = {
     }
     ctx.globalCompositeOperation = 'source-over';
     requestAnimationFrame(() => this.frame());
+  },
+
+  // Rotating HUD rings: a dashed outer ring, tick marks and three arcs that stretch with the audio level.
+  drawHud(ctx, c, size) {
+    const hue = this.colors[2][0];
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.lineCap = 'round';
+
+    ctx.lineWidth = size * 0.004;
+    ctx.strokeStyle = `hsla(${hue}, 100%, 72%, 0.45)`;
+    ctx.setLineDash([size * 0.018, size * 0.014]);
+    ctx.beginPath();
+    ctx.arc(c, c, c * 0.88, this.spin * 1.5, this.spin * 1.5 + Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    for (let i = 0; i < 72; i++) {
+      const a = (i / 72) * Math.PI * 2 - this.spin * 0.5;
+      const major = i % 6 === 0;
+      const r1 = c * 0.93;
+      const r2 = c * (major ? 0.985 : 0.955);
+      ctx.strokeStyle = `hsla(${hue}, 90%, 78%, ${major ? 0.55 : 0.18})`;
+      ctx.lineWidth = size * (major ? 0.004 : 0.0025);
+      ctx.beginPath();
+      ctx.moveTo(c + Math.cos(a) * r1, c + Math.sin(a) * r1);
+      ctx.lineTo(c + Math.cos(a) * r2, c + Math.sin(a) * r2);
+      ctx.stroke();
+    }
+
+    ctx.shadowColor = `hsla(${this.colors[0][0]}, 100%, 65%, 0.9)`;
+    ctx.shadowBlur = size * 0.03;
+    ctx.lineWidth = size * 0.009;
+    ctx.strokeStyle = `hsla(${this.colors[0][0]}, 100%, 74%, 0.9)`;
+    for (let i = 0; i < 3; i++) {
+      const start = -this.spin * 2.4 + (i * Math.PI * 2) / 3;
+      ctx.beginPath();
+      ctx.arc(c, c, c * 0.79, start, start + Math.PI / 5 + this.level * 0.9);
+      ctx.stroke();
+    }
+    ctx.restore();
   },
 };
 
@@ -164,6 +208,29 @@ function toast(text) {
   setTimeout(() => el.remove(), 4000);
 }
 
+// ---------- Mini mode captions ----------
+
+let captionTimer;
+function caption(text, kind) {
+  const el = $('caption');
+  clearTimeout(captionTimer);
+  el.className = `caption show ${kind}`;
+  el.textContent = text;
+}
+
+function captionAppend(delta) {
+  const el = $('caption');
+  if (!el.classList.contains('assistant')) caption('', 'assistant');
+  let text = el.textContent + delta;
+  if (text.length > 190) text = `…${text.slice(-180).replace(/^\S*\s/, '')}`; // keep the latest words
+  el.textContent = text;
+}
+
+function fadeCaption(delay = 7000) {
+  clearTimeout(captionTimer);
+  captionTimer = setTimeout(() => $('caption').classList.remove('show'), delay);
+}
+
 function renderHint() {
   const hint = $('hint');
   if (state === 'idle') {
@@ -184,6 +251,10 @@ function setState(next) {
   orb.setState(next);
   $('status').textContent = STATUS[next] || next;
   $('micBtn').classList.toggle('active', next !== 'idle');
+  $('miniStatus').textContent = next === 'idle'
+    ? (info.wakeWord && info.wakeReady ? `Say “Hey ${info.name}”` : 'Tap the orb to talk')
+    : (STATUS[next] || next).replace('…', '');
+  if (next === 'idle') fadeCaption();
   if (next !== 'thinking') $('tool').hidden = true;
   renderHint();
 }
@@ -210,7 +281,10 @@ window.ui = {
       case 'info': applyInfo(event); break;
       case 'state': setState(event.state); break;
       case 'level': orb.setLevel(event.value); break;
-      case 'user': addMessage('user', event.text); break;
+      case 'user':
+        addMessage('user', event.text);
+        caption(`“${event.text}”`, 'user');
+        break;
       case 'assistant_start':
         current = null;
         toolsRow = null;
@@ -220,6 +294,7 @@ window.ui = {
           current = addMessage('assistant typing', '');
         }
         current.textContent += event.text;
+        captionAppend(event.text);
         scrollDown();
         break;
       case 'assistant_end':
@@ -232,6 +307,7 @@ window.ui = {
       case 'tool': {
         const chip = $('tool');
         chip.textContent = event.label;
+        $('miniStatus').textContent = event.label;
         chip.hidden = false;
         if (!toolsRow) {
           messages.querySelector('.empty')?.remove();
@@ -252,6 +328,7 @@ window.ui = {
         orb.setState('error');
         setTimeout(() => orb.setState(state), 1200);
         addMessage('error', event.message);
+        caption(event.message, 'error');
         break;
     }
   },
@@ -287,6 +364,10 @@ $('muteBtn').addEventListener('click', () => {
   applyInfo({ muted: !info.muted });
   api()?.set_muted(info.muted);
 });
+$('miniBtn').addEventListener('click', () => api()?.mini());
+$('expandBtn').addEventListener('click', () => api()?.expand());
+$('quitBtn').addEventListener('click', () => api()?.quit());
+$('orb').addEventListener('click', talk);
 $('clearBtn').addEventListener('click', () => {
   api()?.clear();
   messages.innerHTML = '';
@@ -302,9 +383,16 @@ document.addEventListener('keydown', (e) => {
 });
 
 window.addEventListener('pywebviewready', async () => {
-  applyInfo(await api().info());
-  setState('idle');
+  if ((await api().mode()) === 'mini') {
+    document.body.classList.add('mini');
+    orb.hud = true;
+  }
+  document.body.classList.add('ready');
+  const current = await api().info();
+  applyInfo(current);
+  setState(current.state || 'idle');
 });
+setTimeout(() => document.body.classList.add('ready'), 1500); // never stay invisible
 
 setState('idle');
 orb.frame();

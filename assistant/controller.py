@@ -6,6 +6,7 @@ import json
 import logging
 import queue
 import threading
+import time
 
 from .audio import Microphone, Speaker, WakeWord, record_utterance, rms
 from .brain import Brain, make_client
@@ -29,7 +30,7 @@ TOOL_LABELS = {
 class Controller:
     def __init__(self, cfg: Config) -> None:
         self.cfg = cfg
-        self.window = None
+        self.windows: list = []
         self.memory = Memory(cfg.data_dir)
         self.client = make_client(cfg)
         self.tools = ToolBox(self.memory, on_timer=self._timer_done)
@@ -44,20 +45,43 @@ class Controller:
         self._busy = threading.Lock()
         self._last_level = 0.0
         self._started = False
+        # UI updates go through their own thread: evaluate_js waits for the page, and doing that on
+        # the microphone thread made it drop audio frames (and miss the wake word).
+        self._events: queue.Queue[dict] = queue.Queue()
+        self._pending_level: dict | None = None
+        threading.Thread(target=self._ui_loop, name="ui-events", daemon=True).start()
 
     # ---------- UI bridge ----------
 
     def attach(self, window) -> None:
-        self.window = window
+        if window not in self.windows:
+            self.windows.append(window)
 
     def _emit(self, kind: str, **data) -> None:
-        if self.window is None:
-            return
-        payload = json.dumps({"type": kind, **data})
-        try:
-            self.window.evaluate_js(f"window.ui && window.ui.handle({payload})")
-        except Exception:
-            log.debug("UI not ready for %s", kind)
+        if kind == "level":
+            self._pending_level = data  # only the latest level matters
+        else:
+            self._events.put({"type": kind, **data})
+
+    def _ui_loop(self) -> None:
+        last_level = 0.0
+        while True:
+            try:
+                self._send(self._events.get(timeout=0.03))
+            except queue.Empty:
+                pass
+            if self._pending_level is not None and time.monotonic() - last_level >= 0.04:
+                level, self._pending_level = self._pending_level, None
+                last_level = time.monotonic()
+                self._send({"type": "level", **level})
+
+    def _send(self, event: dict) -> None:
+        script = f"window.ui && window.ui.handle({json.dumps(event)})"
+        for window in list(self.windows):
+            try:
+                window.evaluate_js(script)
+            except Exception:
+                log.debug("UI not ready for %s", event["type"])
 
     def _set_state(self, state: str) -> None:
         self.state = state
@@ -98,14 +122,14 @@ class Controller:
             self._emit("toast", message=f"Wake word unavailable ({error}). Use the mic button or Space.")
 
     def _on_frame(self, frame) -> None:
+        if self.state == "idle" and self.wake_enabled and self.wake and self.wake.heard(frame):
+            self.listen()
         if self.state in ("idle", "listening"):
             level = min(1.0, rms(frame) / 4000)
             # Throttle UI updates a little and skip near-silence repeats.
             if abs(level - self._last_level) > 0.01 or level > 0.02:
                 self._last_level = level
                 self._emit("level", value=level, source="mic")
-        if self.state == "idle" and self.wake_enabled and self.wake and self.wake.heard(frame):
-            self.listen()
 
     # ---------- Actions from the UI ----------
 

@@ -41,7 +41,7 @@ def load_config() -> Config:
         voice=os.getenv("VOICE", "en-GB-RyanNeural").strip(),
         language=os.getenv("LANGUAGE", "en-US").strip(),
         wake_word=_flag(os.getenv("WAKE_WORD"), True),
-        wake_threshold=float(os.getenv("WAKE_THRESHOLD", "0.5")),
+        wake_threshold=float(os.getenv("WAKE_THRESHOLD", "0.4")),
         stt=os.getenv("STT", "google").strip().lower(),
         stt_model=os.getenv("STT_MODEL", "google/gemini-3.8-flash").strip(),
         data_dir=data_dir,

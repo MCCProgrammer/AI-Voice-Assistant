@@ -22,6 +22,9 @@
         <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
         <span>Voice</span>
       </button>
+      <button id="miniBtn" class="icon-btn" type="button" title="Floating mini mode">
+        <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><rect x="12" y="11" width="7" height="6" rx="1"/></svg>
+      </button>
       <button id="clearBtn" class="icon-btn" type="button" title="New conversation">
         <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
       </button>
@@ -31,6 +34,19 @@
   <main class="stage">
     <section class="orb-area">
       <canvas id="orb"></canvas>
+      <!-- Floating mini mode: just the orb, a status line and live captions -->
+      <div class="mini-hud">
+        <div class="mini-controls">
+          <button id="expandBtn" type="button" title="Open full window">
+            <svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+          </button>
+          <button id="quitBtn" type="button" title="Quit">
+            <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div id="miniStatus" class="mini-status"></div>
+        <div id="caption" class="caption"></div>
+      </div>
       <div class="status">
         <div id="status" class="status-main">Starting…</div>
         <div id="hint" class="status-hint"></div>

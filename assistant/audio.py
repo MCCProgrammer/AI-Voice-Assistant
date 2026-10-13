@@ -56,7 +56,7 @@ class Microphone:
         try:
             self._queue.put_nowait(indata[:, 0].copy())
         except queue.Full:
-            pass  # the app is busy; dropping a frame is better than blocking the audio thread
+            log.warning("microphone frame dropped (the app is too busy)")
 
     def _dispatch(self) -> None:
         while True:
@@ -130,12 +130,16 @@ class WakeWord:
         self._model = Model(wakeword_models=["hey_jarvis"], inference_framework="onnx")
         self._threshold = threshold
         self._cooldown_until = 0.0
+        self._last_log = 0.0
 
     def heard(self, frame: np.ndarray) -> bool:
-        scores = self._model.predict(frame)
+        score = max(self._model.predict(frame).values())
+        if score > 0.1 and time.monotonic() > self._last_log + 0.5:
+            self._last_log = time.monotonic()  # run with --verbose to tune WAKE_THRESHOLD
+            log.info("wake word score %.2f (threshold %.2f)", score, self._threshold)
         if time.monotonic() < self._cooldown_until:
             return False
-        if max(scores.values()) >= self._threshold:
+        if score >= self._threshold:
             self.reset()
             return True
         return False

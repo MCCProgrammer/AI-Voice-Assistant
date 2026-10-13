@@ -13,6 +13,7 @@ A desktop voice assistant powered by **Claude** (through [OpenRouter](https://op
 - 🛠️ **17 tools** — web search, news, reading web pages, Wikipedia, weather, YouTube, opening apps and websites, volume, battery/CPU, timers, notes and long-term memory.
 - 💾 **Memory** — tell it your name or preferences and it remembers them across sessions.
 - 🎨 **Animated orb** that reacts to your voice and to its own, with a live transcript, tool activity and a text box for when you'd rather type.
+- 🪐 **Floating mini mode** — minimize the window (or click the mini button) and Jarvis becomes a transparent, always-on-top orb with HUD rings and live captions that you can drag anywhere.
 - 🔌 **Any model** — switch to any OpenRouter model with tool calling by changing one line.
 
 ## How it works
@@ -50,7 +51,9 @@ python main.py
 
 The first launch downloads the small wake word model (~5 MB). On macOS, allow microphone access for your terminal when asked.
 
-**Controls:** say “Hey Jarvis”, press <kbd>Space</kbd> or click the mic to talk · <kbd>Esc</kbd> to stop · or just type.
+**Controls:** say “Hey Jarvis”, press <kbd>Space</kbd>, click the mic or the orb to talk · <kbd>Esc</kbd> to stop · or just type. Minimize the window to switch to the floating orb; hover it to expand back or quit.
+
+**Wake word not triggering?** Run `python main.py --verbose` and say “Hey Jarvis”: the terminal prints the detection score. If your peaks stay below the threshold (for example with a non-native accent), lower `WAKE_THRESHOLD` in `.env` — try `0.3`.
 
 ## Configuration
 
@@ -64,7 +67,7 @@ Everything lives in `.env`:
 | `VOICE` | `en-GB-RyanNeural` | Reply voice — list them with `edge-tts --list-voices` |
 | `LANGUAGE` | `en-US` | Language you speak (e.g. `pt-PT`) |
 | `WAKE_WORD` | `on` | Listen for “Hey Jarvis” |
-| `WAKE_THRESHOLD` | `0.5` | Lower = more sensitive wake word |
+| `WAKE_THRESHOLD` | `0.4` | Lower = more sensitive wake word. Run with `--verbose` to see your scores |
 | `STT` | `google` | `google` (free) or `openrouter` (uses `STT_MODEL`) |
 | `STT_MODEL` | `google/gemini-3.8-flash` | Audio-capable model used when `STT=openrouter` |
 
