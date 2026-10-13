@@ -28,6 +28,8 @@ class Config:
     wake_threshold: float
     stt: str
     stt_model: str
+    listen_seconds: float
+    pause_seconds: float
     data_dir: Path
 
 
@@ -44,5 +46,7 @@ def load_config() -> Config:
         wake_threshold=float(os.getenv("WAKE_THRESHOLD", "0.4")),
         stt=os.getenv("STT", "google").strip().lower(),
         stt_model=os.getenv("STT_MODEL", "google/gemini-3.8-flash").strip(),
+        listen_seconds=float(os.getenv("LISTEN_SECONDS", "10")),
+        pause_seconds=float(os.getenv("PAUSE_SECONDS", "1.5")),
         data_dir=data_dir,
     )

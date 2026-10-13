@@ -9,8 +9,11 @@ A desktop voice assistant powered by **Claude** (through [OpenRouter](https://op
 - 🗣️ **Hands-free** — local wake word (“Hey Jarvis”) with [openWakeWord](https://github.com/dscripka/openWakeWord); nothing leaves your computer until you speak to it.
 - 🧠 **Real conversation** — Claude keeps context, follows up, and decides by itself which tools to use.
 - ⚡ **Low latency** — replies are streamed and spoken sentence by sentence, so it starts talking before it finishes thinking.
-- 🔁 **Follow-ups without the wake word** — after answering it keeps listening for a few seconds.
-- 🛠️ **17 tools** — web search, news, reading web pages, Wikipedia, weather, YouTube, opening apps and websites, volume, battery/CPU, timers, notes and long-term memory.
+- 🔁 **Natural conversation** — after “Hey Jarvis” it waits for you to think, tolerates pauses mid-sentence, and keeps listening after each answer until you go quiet or say “stop”.
+- 🔔 **Reminders** — “remind me to call mum tomorrow at 6pm” is saved to disk, listed in the Reminders tab, and announced with a spoken alert and a system notification, even after a restart.
+- 📂 **Your computer** — “open my Downloads folder”, any folder by name, apps, volume, battery, plus named **shortcuts** (“open my GitHub repositories”) you can create by voice.
+- 🧭 **“What I can do” tab** listing every skill with example phrases you can click to try.
+- 🛠️ **24 tools** — web search, news, reading web pages, Wikipedia, weather, YouTube, folders, apps, websites, shortcuts, volume, battery/CPU, timers, reminders, notes and long-term memory.
 - 🃏 **Visual cards** — it speaks the short answer and shows the details: weather with an hourly chart and 7-day forecast (plus “not the right place?” suggestions if it misheard), web results, news with images, Wikipedia, YouTube, notes, live timers and system gauges. Click your own message to fix a misheard question and resend it.
 - 💾 **Memory** — tell it your name or preferences and it remembers them across sessions.
 - 🎨 **Animated orb** that reacts to your voice and to its own, with a live transcript, tool activity and a text box for when you'd rather type.
@@ -68,11 +71,13 @@ Everything lives in `.env`:
 | `VOICE` | `en-GB-RyanNeural` | Reply voice — list them with `edge-tts --list-voices` |
 | `LANGUAGE` | `en-US` | Language you speak (e.g. `pt-PT`) |
 | `WAKE_WORD` | `on` | Listen for “Hey Jarvis” |
+| `LISTEN_SECONDS` | `10` | How long it waits for you to start talking (after the wake word and between turns) |
+| `PAUSE_SECONDS` | `1.5` | How long you can pause mid-sentence before it answers |
 | `WAKE_THRESHOLD` | `0.4` | Lower = more sensitive wake word. Run with `--verbose` to see your scores |
 | `STT` | `google` | `google` (free) or `openrouter` (uses `STT_MODEL`) |
 | `STT_MODEL` | `google/gemini-3.8-flash` | Audio-capable model used when `STT=openrouter` |
 
-Memory and notes are stored in `~/.jarvis-assistant/memory.json`.
+Memory, notes, reminders and shortcuts are stored in `~/.jarvis-assistant/memory.json`.
 
 ## Things to try
 
@@ -80,6 +85,8 @@ Memory and notes are stored in `~/.jarvis-assistant/memory.json`.
 - “What's new in tech today?” → “Tell me more about the second one.”
 - “Play some lofi on YouTube.”
 - “Set a timer for 10 minutes for the pasta.”
+- “Remind me to take out the bins on Thursday at 8am.”
+- “Open my Downloads folder.” · “Save a shortcut called GitHub for github.com/your-name.” → “Open GitHub.”
 - “My name is Miguel and I support Benfica.” — then later: “What do you know about me?”
 - “Open Spotify and set the volume to 30.”
 - “How's my battery?”

@@ -41,6 +41,7 @@ class Brain:
     def system_prompt(self) -> str:
         facts = "\n".join(f"- {fact}" for fact in self.memory.facts) or "- (nothing yet)"
         now = datetime.now().astimezone().strftime("%A, %d %B %Y, %H:%M %Z")
+        shortcuts = ", ".join(f"{name} → {target}" for name, target in self.memory.shortcuts.items()) or "none"
         return f"""You are {self.cfg.name}, a friendly and witty voice assistant running on the user's {platform.system()} computer.
 
 Your replies are spoken out loud, so:
@@ -58,6 +59,11 @@ never read out lists, links or every number. For the weather, pass the requested
 and mention the place you found, in case the user's words were misheard.
 When the user shares something worth keeping (their name, preferences, important people or plans), save it with
 the remember tool without asking.
+
+Use set_timer for countdowns ("in 10 minutes") and set_reminder for things at a time or on a day ("tomorrow at 9").
+Use open_folder for folders and open_shortcut for the user's saved shortcuts; offer to save a shortcut with
+add_shortcut when the user often opens the same link or folder.
+Saved shortcuts: {shortcuts}
 
 Current date and time: {now}.
 What you remember about the user:

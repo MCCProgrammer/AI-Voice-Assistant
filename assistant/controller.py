@@ -4,9 +4,13 @@ States: idle → listening → transcribing → thinking → speaking → (follo
 """
 import json
 import logging
+import platform
 import queue
+import re
+import subprocess
 import threading
 import time
+from datetime import datetime
 
 from .audio import Microphone, Speaker, WakeWord, record_utterance, rms
 from .brain import Brain, make_client
@@ -16,6 +20,11 @@ from .speech import SentenceSplitter, speakable, synthesize, transcribe
 from .tools import ToolBox
 
 log = logging.getLogger(__name__)
+
+# Saying one of these during a conversation ends it without asking the model.
+END_PHRASES = re.compile(
+    r"^(ok(ay)?,? )?(stop|cancel|never ?mind|that'?s (all|it)|nothing|no,? thanks?( you)?|bye|goodbye|"
+    r"thanks?( you)?,? (that'?s all|bye))[.!]*$", re.I)
 
 TOOL_LABELS = {
     "get_datetime": "Checking the time", "get_weather": "Checking the weather", "web_search": "Searching the web",
@@ -32,6 +41,7 @@ class Controller:
         self.cfg = cfg
         self.windows: list = []
         self.memory = Memory(cfg.data_dir)
+        self.memory.on_change = lambda: self._emit("data", **self._data())
         self.client = make_client(cfg)
         self.tools = ToolBox(self.memory, on_timer=self._timer_done)
         self.brain = Brain(cfg, self.client, self.tools, self.memory)
@@ -83,9 +93,9 @@ class Controller:
             except Exception:
                 log.debug("UI not ready for %s", event["type"])
 
-    def _set_state(self, state: str) -> None:
+    def _set_state(self, state: str, **extra) -> None:
         self.state = state
-        self._emit("state", state=state)
+        self._emit("state", state=state, **extra)
 
     def info(self) -> dict:
         return {
@@ -96,7 +106,12 @@ class Controller:
             "wakeReady": self.wake is not None,
             "muted": self.muted,
             "state": self.state,
+            "listenSeconds": self.cfg.listen_seconds,
+            **self._data(),
         }
+
+    def _data(self) -> dict:
+        return {"reminders": self.memory.reminders, "shortcuts": self.memory.shortcuts}
 
     # ---------- Startup ----------
 
@@ -112,6 +127,7 @@ class Controller:
             return
         self.mic.subscribe(self._on_frame)
         threading.Thread(target=self._load_wake_word, daemon=True).start()
+        threading.Thread(target=self._reminder_loop, name="reminders", daemon=True).start()
 
     def _load_wake_word(self) -> None:
         try:
@@ -165,17 +181,28 @@ class Controller:
     # ---------- Conversation loop ----------
 
     def _conversation(self, voice: bool, text: str | None = None) -> None:
+        """One exchange when typing; when talking, keeps listening for replies until silence or "stop"."""
         if not self._busy.acquire(blocking=False):
             return
         self._cancel.clear()
         follow_up = False
+        misses = 0
         try:
             while not self._cancel.is_set():
                 if voice:
                     text = self._hear(follow_up)
-                    if not text:
+                    if text is None:  # nobody spoke
                         break
+                    if not text:  # spoke but unintelligible: try again, up to twice
+                        misses += 1
+                        if misses > 2:
+                            break
+                        continue
+                    misses = 0
                 self._emit("user", text=text)
+                if voice and follow_up and END_PHRASES.match(text.strip()):
+                    self._emit("toast", message="Okay — I'm here if you need me 👋")
+                    break
                 self._respond(text)
                 if not voice or self._cancel.is_set():
                     break
@@ -191,15 +218,17 @@ class Controller:
             self._busy.release()
 
     def _hear(self, follow_up: bool) -> str | None:
-        self._set_state("listening")
-        pcm = record_utterance(self.mic, self._cancel, start_timeout=5.0 if follow_up else 7.0)
+        """Returns what was said, "" if it couldn't be understood, or None if nobody spoke."""
+        self._set_state("listening", followUp=follow_up)
+        pcm = record_utterance(self.mic, self._cancel, start_timeout=self.cfg.listen_seconds,
+                               silence_after=self.cfg.pause_seconds, max_seconds=45.0)
         if not pcm:
             return None
         self._set_state("transcribing")
         text = transcribe(pcm, self.cfg, self.client)
         if not text:
-            self._emit("toast", message="Sorry, I didn't catch that.")
-        return text or None
+            self._emit("toast", message="Sorry, I didn't catch that — say it again.")
+        return text
 
     def _respond(self, text: str) -> None:
         if not self.cfg.api_key:
@@ -250,10 +279,30 @@ class Controller:
             self.speaker.play(pcm)
         self.speaker.finish()
 
+    # ---------- Reminders and timers ----------
+
+    def _reminder_loop(self) -> None:
+        while True:
+            for reminder in self.memory.due_reminders(datetime.now()):
+                self.memory.complete_reminder(reminder["id"])
+                self._alert(f"Reminder: {reminder['text']}", {"type": "reminder", **reminder, "alert": True})
+            time.sleep(10)
+
+    def delete_reminder(self, reminder_id: str) -> None:
+        self.memory.cancel_reminders(reminder_id)
+
     def _timer_done(self, label: str) -> None:
-        self._emit("toast", message=f"⏰ {label} — time's up!")
+        self._alert(f"Your {label.lower()} timer is done.", {"type": "memory", "text": f"⏰ {label} — time's up!"})
+
+    def _alert(self, spoken: str, card: dict) -> None:
+        """Shows, notifies and says something the user asked to be reminded of."""
+        self._emit("card", tool="alert", card=card)
+        self._emit("toast", message=f"🔔 {spoken}")
+        if platform.system() == "Darwin":
+            script = f'display notification {json.dumps(spoken)} with title {json.dumps(self.cfg.name)} sound name "Glass"'
+            subprocess.run(["osascript", "-e", script], capture_output=True)
         if not self.muted and not self._busy.locked():
-            pcm = synthesize(f"Your {label.lower()} timer is done.", self.cfg.voice)
+            pcm = synthesize(spoken, self.cfg.voice)
             if pcm is not None:
                 self.speaker.play(pcm)
                 self.speaker.finish()

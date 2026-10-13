@@ -56,7 +56,14 @@
     </section>
 
     <aside class="chat">
-      <div id="messages" class="messages">
+      <nav class="tabs">
+        <button class="tab active" type="button" data-tab="chat">Chat</button>
+        <button class="tab" type="button" data-tab="reminders">Reminders <span id="reminderCount" class="count" hidden></span></button>
+        <button class="tab" type="button" data-tab="skills">What I can do</button>
+      </nav>
+      <div id="reminders" class="panel" data-panel="reminders" hidden></div>
+      <div id="skills" class="panel" data-panel="skills" hidden></div>
+      <div id="messages" class="messages" data-panel="chat">
         <div class="empty">
           <p class="empty-title">Ask me anything</p>
           <div class="suggestions">

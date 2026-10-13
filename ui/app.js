@@ -266,7 +266,7 @@ function renderHint() {
     const wake = info.wakeWord && info.wakeReady ? `Say “Hey ${info.name}” or press ` : 'Press ';
     hint.innerHTML = `${wake}<kbd>Space</kbd>`;
   } else if (state === 'listening') {
-    hint.textContent = 'Speak now — I’ll stop when you pause';
+    hint.innerHTML = followUp ? 'Keep talking, or say “stop” to finish' : 'Take your time — I’ll wait for you to finish';
   } else if (state === 'speaking' || state === 'thinking') {
     hint.innerHTML = '<kbd>Esc</kbd> to stop';
   } else {
@@ -274,15 +274,17 @@ function renderHint() {
   }
 }
 
-function setState(next) {
+let followUp = false;
+function setState(next, extra = {}) {
   if (next === 'listening' && state !== 'listening') chime(true);
   state = next;
+  followUp = next === 'listening' && !!extra.followUp;
   orb.setState(next);
-  $('status').textContent = STATUS[next] || next;
+  $('status').textContent = followUp ? 'Still listening…' : (STATUS[next] || next);
   $('micBtn').classList.toggle('active', next !== 'idle');
   $('miniStatus').textContent = next === 'idle'
     ? (info.wakeWord && info.wakeReady ? `Say “Hey ${info.name}”` : 'Tap the orb to talk')
-    : (STATUS[next] || next).replace('…', '');
+    : (followUp ? 'Still listening' : (STATUS[next] || next).replace('…', ''));
   if (next === 'idle') fadeCaption();
   if (next !== 'thinking') $('tool').hidden = true;
   renderHint();
@@ -296,6 +298,8 @@ function applyInfo(next) {
   $('wakeBtn').classList.toggle('on', info.wakeWord);
   $('wakeBtn').title = `Listen for “Hey ${info.name}”`;
   $('muteBtn').classList.toggle('on', !info.muted);
+  if (next.reminders) renderReminders(info.reminders);
+  if (next.shortcuts) renderSkills(info.shortcuts);
   if (!info.hasKey) {
     addMessage('error', 'No OpenRouter API key found. Copy .env.example to .env, add OPENROUTER_API_KEY and restart.');
   }
@@ -308,7 +312,12 @@ window.ui = {
   handle(event) {
     switch (event.type) {
       case 'info': applyInfo(event); break;
-      case 'state': setState(event.state); break;
+      case 'state': setState(event.state, event); break;
+      case 'data':
+        info = { ...info, ...event };
+        renderReminders(event.reminders);
+        renderSkills(event.shortcuts);
+        break;
       case 'level': orb.setLevel(event.value); break;
       case 'user':
         addMessage('user', event.text);
@@ -381,6 +390,85 @@ function talk() {
   else api()?.stop();
 }
 
+// ---------- Tabs: Chat · Reminders · Skills ----------
+
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('[data-panel]').forEach((p) => { p.hidden = p.dataset.panel !== name; });
+}
+document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => showTab(t.dataset.tab)));
+
+const timeFmt = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' });
+function relative(date) {
+  const minutes = Math.round((date - Date.now()) / 60000);
+  if (minutes < 1) return 'now';
+  if (minutes < 60) return `in ${minutes} min`;
+  if (minutes < 60 * 24) return `in ${Math.round(minutes / 60)} h`;
+  return `in ${Math.round(minutes / 1440)} days`;
+}
+
+function renderReminders(items = []) {
+  const count = $('reminderCount');
+  count.textContent = items.length;
+  count.hidden = !items.length;
+  const panel = $('reminders');
+  if (!items.length) {
+    panel.replaceChildren(h('div', { class: 'panel-empty' },
+      h('div', { class: 'panel-empty-icon' }, '🔔'),
+      h('strong', {}, 'No reminders yet'),
+      h('p', {}, 'Ask me to remind you of something, at a time or on a day.'),
+      ...['Remind me to call mum tomorrow at 6pm', 'Remind me to take out the bins on Thursday at 8am']
+        .map((t) => h('button', { type: 'button', class: 'example', onclick: () => { showTab('chat'); send(t); } }, `“${t}”`))));
+    return;
+  }
+  const groups = new Map();
+  for (const r of items) {
+    const day = r.due.slice(0, 10);
+    if (!groups.has(day)) groups.set(day, []);
+    groups.get(day).push(r);
+  }
+  panel.replaceChildren(...[...groups].map(([day, list]) => h('section', { class: 'rem-group' },
+    h('div', { class: 'rem-day' }, `${dayName(day, 'long')} · ${fullDate(day)}`),
+    ...list.map((r) => {
+      const due = new Date(r.due);
+      return h('div', { class: 'rem' },
+        h('div', { class: 'rem-time' }, timeFmt.format(due)),
+        h('div', { class: 'rem-body' }, h('div', { class: 'rem-text' }, r.text), h('div', { class: 'rem-rel' }, relative(due))),
+        h('button', { type: 'button', class: 'rem-del', title: 'Delete reminder', onclick: () => api()?.delete_reminder(r.id) }, '✕'));
+    }))));
+}
+
+const SKILLS = [
+  ['🌤️', 'Weather', 'Now, hourly and 7-day forecast for any place.', ['What\'s the weather tomorrow in Costa da Caparica?', 'Will it rain this weekend in Lisbon?']],
+  ['🔔', 'Reminders & timers', 'Reminders are saved and alert you even after a restart.', ['Remind me to call mum at 6pm', 'Set a timer for 10 minutes', 'What are my reminders?']],
+  ['💻', 'Your computer', 'Folders, apps, volume and battery.', ['Open my Downloads folder', 'Open Spotify', 'Set the volume to 30', 'How\'s my battery?']],
+  ['🔗', 'Shortcuts', 'Name a link or folder once, open it by voice.', ['Open my GitHub repositories', 'Save a shortcut called school for my Documents folder']],
+  ['🔎', 'Web & news', 'Searches the web, reads pages and the latest headlines.', ['What\'s new in tech today?', 'Search for the best beaches near Lisbon']],
+  ['📖', 'Knowledge', 'Wikipedia summaries and quick facts.', ['Who was Alan Turing?', 'Tell me about Costa da Caparica']],
+  ['🎵', 'YouTube', 'Finds and plays videos and music.', ['Play some lofi on YouTube']],
+  ['🧠', 'Memory & notes', 'Remembers things about you and keeps notes.', ['Remember that my favourite team is Benfica', 'Take a note: buy sunscreen', 'What do you know about me?']],
+];
+
+function renderSkills(shortcuts = {}) {
+  const tips = h('div', { class: 'tips' },
+    h('strong', {}, '🎙️ Talking to me'),
+    h('ul', {},
+      h('li', {}, `Say “Hey ${info.name}”, press Space or click the orb.`),
+      h('li', {}, `Take your time: I wait up to ${info.listenSeconds || 10} seconds for you to start, and you can pause mid-sentence.`),
+      h('li', {}, 'In a conversation I keep listening after each answer — say “stop” or “that’s all” to finish.'),
+      h('li', {}, 'Misheard? Click your message to fix it and resend.')));
+  const entries = Object.entries(shortcuts);
+  const saved = entries.length ? h('div', { class: 'skill' },
+    h('div', { class: 'skill-head' }, h('span', { class: 'skill-icon' }, '⭐'), h('strong', {}, 'Your shortcuts')),
+    h('div', { class: 'chips' }, entries.map(([name, target]) => h('button', {
+      type: 'button', title: target, onclick: () => { showTab('chat'); send(`Open ${name}`); },
+    }, name)))) : null;
+  $('skills').replaceChildren(...[tips, saved, ...SKILLS.map(([icon, title, desc, examples]) => h('div', { class: 'skill' },
+    h('div', { class: 'skill-head' }, h('span', { class: 'skill-icon' }, icon), h('strong', {}, title)),
+    h('p', {}, desc),
+    h('div', { class: 'chips' }, examples.map((t) => h('button', { type: 'button', onclick: () => { showTab('chat'); send(t); } }, t)))))].filter(Boolean));
+}
+
 function send(text) {
   if (!text.trim()) return;
   api()?.send_text(text);
@@ -389,6 +477,7 @@ function send(text) {
 $('micBtn').addEventListener('click', talk);
 $('composer').addEventListener('submit', (e) => {
   e.preventDefault();
+  showTab('chat');
   send($('input').value);
   $('input').value = '';
 });
@@ -434,5 +523,7 @@ window.addEventListener('pywebviewready', async () => {
 });
 setTimeout(() => document.body.classList.add('ready'), 1500); // never stay invisible
 
+renderReminders([]);
+renderSkills({});
 setState('idle');
 orb.frame();

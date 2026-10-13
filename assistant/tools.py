@@ -2,6 +2,7 @@
 import html
 import json
 import logging
+import os
 import platform
 import re
 import subprocess
@@ -11,6 +12,7 @@ import urllib.request
 import webbrowser
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Callable
 
 from .memory import Memory
@@ -52,6 +54,48 @@ def tool(description: str, **params: tuple[str, str] | tuple[str, str, bool]):
         }
         return fn
     return decorate
+
+
+KNOWN_FOLDERS = {
+    "home": "~", "downloads": "~/Downloads", "documents": "~/Documents", "desktop": "~/Desktop",
+    "pictures": "~/Pictures", "photos": "~/Pictures", "music": "~/Music", "movies": "~/Movies",
+    "videos": "~/Movies" if platform.system() == "Darwin" else "~/Videos",
+    "applications": "/Applications", "apps": "/Applications",
+}
+
+
+def open_path(path: str) -> bool:
+    """Opens a folder, file or URL with the system's default handler (Finder, Explorer, browser…)."""
+    system = platform.system()
+    if system == "Darwin":
+        command = ["open", path]
+    elif system == "Windows":
+        command = ["explorer", path]
+    else:
+        command = ["xdg-open", path]
+    return subprocess.run(command, capture_output=True).returncode == 0 or system == "Windows"
+
+
+def find_folder(name: str, max_depth: int = 3) -> Path | None:
+    """Finds a folder in the home directory by (case-insensitive) name, shallowest first."""
+    wanted = name.strip().lower()
+    home = Path.home()
+    skip = {"library", "node_modules", "applications", ".trash"}
+    frontier = [home]
+    for _ in range(max_depth):
+        next_level = []
+        for folder in frontier:
+            try:
+                children = [c for c in folder.iterdir() if c.is_dir() and not c.name.startswith(".")]
+            except (PermissionError, OSError):
+                continue
+            for child in sorted(children):
+                if child.name.lower() == wanted:
+                    return child
+                if child.name.lower() not in skip:
+                    next_level.append(child)
+        frontier = next_level
+    return None
 
 
 def domain_of(url: str) -> str:
@@ -264,6 +308,49 @@ class ToolBox:
         card = {"type": "video", "title": title, "url": url, "thumb": f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"}
         return ToolResult(f"Playing on YouTube: {title}", card)
 
+    @tool("Open a folder in Finder/Explorer: Downloads, Documents, Desktop, Pictures, Music, Movies, home, "
+          "or any folder in the user's home by name, or a full path.",
+          name=("string", "Folder name like 'Downloads' or 'Development', or a path like '~/Documents/Work'"))
+    def open_folder(self, name):
+        key = re.sub(r"\s*folder$", "", name.strip(), flags=re.I).lower()
+        path = Path(os.path.expanduser(KNOWN_FOLDERS.get(key, name))).resolve()
+        if not path.is_dir():
+            path = find_folder(key)
+        if path is None:
+            return ToolResult(f"Couldn't find a folder called {name}.", {"type": "notfound", "query": name, "kind": "folder"})
+        open_path(str(path))
+        try:
+            count = sum(1 for c in path.iterdir() if not c.name.startswith("."))
+        except OSError:
+            count = None
+        return ToolResult(f"Opened {path}", {"type": "folder", "name": path.name or str(path), "path": str(path), "count": count})
+
+    @tool("Open one of the user's saved shortcuts (named links or folders, e.g. 'GitHub repositories').",
+          name=("string", "Shortcut name, as the user says it"))
+    def open_shortcut(self, name):
+        shortcuts = self.memory.shortcuts
+        wanted = name.strip().lower()
+        match = shortcuts.get(wanted) or next(
+            (target for key, target in shortcuts.items() if wanted in key or key in wanted), None)
+        if not match:
+            return f"No shortcut called {name}. Saved shortcuts: {', '.join(shortcuts) or 'none'}."
+        if re.match(r"^https?://", match):
+            webbrowser.open(match)
+        else:
+            open_path(os.path.expanduser(match))
+        return ToolResult(f"Opened {match}", {"type": "shortcut", "name": name, "target": match})
+
+    @tool("Save a named shortcut to a website or folder so the user can open it by voice later.",
+          name=("string", "Short name, e.g. 'GitHub repositories'"),
+          target=("string", "Full URL (https://…) or folder path"))
+    def add_shortcut(self, name, target):
+        self.memory.add_shortcut(name, target)
+        return ToolResult(f"Shortcut '{name}' saved.", {"type": "shortcut", "name": name, "target": target, "saved": True})
+
+    @tool("Delete a saved shortcut.", name=("string", "Shortcut name"))
+    def remove_shortcut(self, name):
+        return "Shortcut removed." if self.memory.remove_shortcut(name) else f"No shortcut called {name}."
+
     @tool("Open an application installed on this computer.", name=("string", "App name, e.g. 'Spotify' or 'Calculator'"))
     def open_app(self, name):
         system = platform.system()
@@ -308,6 +395,30 @@ class ToolBox:
         card = {"type": "timer", "label": label, "seconds": int(seconds),
                 "ends_at": (datetime.now().timestamp() + int(seconds)) * 1000}
         return ToolResult(f"Timer '{label}' set for {minutes} min {secs} s.", card)
+
+    # ---------- Reminders ----------
+
+    @tool("Save a reminder for a date and time. It's stored and the user is alerted when it's due, "
+          "even after restarting the app.",
+          text=("string", "What to remind the user about, e.g. 'Call mum'"),
+          when=("string", "Local date and time as YYYY-MM-DDTHH:MM, worked out from the current date and time"))
+    def set_reminder(self, text, when):
+        due = datetime.fromisoformat(when.strip().replace(" ", "T"))
+        if due <= datetime.now():
+            return f"{when} is in the past. Ask the user for a future time."
+        reminder = self.memory.add_reminder(text, due)
+        return ToolResult(f"Reminder saved for {due:%A %d %B at %H:%M}.", {"type": "reminder", **reminder})
+
+    @tool("List the user's upcoming reminders.")
+    def list_reminders(self):
+        items = self.memory.reminders
+        text = [f"{r['due'].replace('T', ' ')}: {r['text']}" for r in items] or "No upcoming reminders."
+        return ToolResult(text, {"type": "reminders", "items": items})
+
+    @tool("Cancel reminders whose text contains some words.", match=("string", "Words from the reminder"))
+    def cancel_reminder(self, match):
+        removed = self.memory.cancel_reminders(match)
+        return f"Cancelled: {[r['text'] for r in removed]}" if removed else "No matching reminder."
 
     # ---------- Memory ----------
 

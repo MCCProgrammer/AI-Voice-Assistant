@@ -246,15 +246,62 @@ function memoryCard(card) {
 }
 
 function notFoundCard(card) {
+  const folder = card.kind === 'folder';
   return h('div', { class: 'card notfound' },
-    h('span', { class: 'card-icon' }, '📍'),
+    h('span', { class: 'card-icon' }, folder ? '📁' : '📍'),
     h('div', {}, h('strong', {}, `Couldn't find “${card.query}”`),
-      h('div', { class: 'muted' }, 'Try saying the name again, or add the country.')));
+      h('div', { class: 'muted' }, folder ? 'Try the exact folder name, or a path like ~/Documents/Work.'
+        : 'Try saying the name again, or add the country.')));
+}
+
+const dueText = (iso) => {
+  const d = new Date(iso);
+  return `${dayName(iso.slice(0, 10), 'long')} at ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
+};
+
+function reminderCard(card) {
+  return h('div', { class: `card reminder${card.alert ? ' alert' : ''}` },
+    h('span', { class: 'big-icon' }, card.alert ? '🔔' : '⏰'),
+    h('div', {},
+      h('div', { class: 'card-kicker' }, card.alert ? 'Reminder' : 'Reminder saved'),
+      h('div', { class: 'main-line' }, card.text),
+      h('div', { class: 'sub-line' }, dueText(card.due))));
+}
+
+function remindersCard(card, compact) {
+  const items = card.items.slice(0, compact ? 3 : 8);
+  return h('div', { class: 'card notes' },
+    h('div', { class: 'card-head' }, h('span', { class: 'card-icon' }, '🔔'),
+      h('div', { class: 'card-title' }, h('strong', {}, 'Upcoming reminders'), h('span', { class: 'muted' }, `${card.items.length}`))),
+    items.length
+      ? h('ul', {}, items.map((r) => h('li', {}, h('strong', {}, dueText(r.due)), ` — ${r.text}`)))
+      : h('div', { class: 'muted' }, 'Nothing scheduled.'));
+}
+
+function folderCard(card) {
+  return h('div', { class: 'card folder' },
+    h('span', { class: 'big-icon' }, '📂'),
+    h('div', { style: 'min-width:0' },
+      h('div', { class: 'card-kicker' }, 'Opened folder'),
+      h('div', { class: 'main-line' }, card.name),
+      h('div', { class: 'sub-line' }, `${card.path}${card.count != null ? ` · ${card.count} items` : ''}`)));
+}
+
+function shortcutCard(card) {
+  const isUrl = /^https?:\/\//.test(card.target);
+  return h('div', { class: 'card shortcut' },
+    isUrl ? h('img', { class: 'fav', src: favicon(new URL(card.target).hostname), alt: '', style: 'width:28px;height:28px' })
+      : h('span', { class: 'big-icon' }, '📂'),
+    h('div', { style: 'min-width:0' },
+      h('div', { class: 'card-kicker' }, card.saved ? 'Shortcut saved' : 'Opened shortcut'),
+      h('div', { class: 'main-line' }, card.name),
+      h('div', { class: 'sub-line' }, card.target)));
 }
 
 const RENDERERS = {
   weather: weatherCard, links: linksCard, news: newsCard, wiki: wikiCard, page: pageCard, video: videoCard,
   system: systemCard, timer: timerCard, notes: notesCard, memory: memoryCard, notfound: notFoundCard,
+  reminder: reminderCard, reminders: remindersCard, folder: folderCard, shortcut: shortcutCard,
 };
 
 window.renderCard = (card, compact = false) => {

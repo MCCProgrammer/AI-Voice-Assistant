@@ -43,6 +43,9 @@ class Bridge:
     def clear(self):
         self._app.controller.clear()
 
+    def delete_reminder(self, reminder_id):
+        self._app.controller.delete_reminder(str(reminder_id))
+
     def open_url(self, url):
         if str(url).startswith(("http://", "https://")):
             webbrowser.open(url)
