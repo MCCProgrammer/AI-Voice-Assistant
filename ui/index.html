@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jarvis</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-dot"></span>
+      <span id="name">Jarvis</span>
+      <span id="model" class="chip"></span>
+    </div>
+    <div class="controls">
+      <button id="wakeBtn" class="toggle" type="button" title="Listen for “Hey Jarvis”">
+        <svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+        <span>Wake word</span>
+      </button>
+      <button id="muteBtn" class="toggle on" type="button" title="Spoken replies">
+        <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+        <span>Voice</span>
+      </button>
+      <button id="clearBtn" class="icon-btn" type="button" title="New conversation">
+        <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="stage">
+    <section class="orb-area">
+      <canvas id="orb"></canvas>
+      <div class="status">
+        <div id="status" class="status-main">Starting…</div>
+        <div id="hint" class="status-hint"></div>
+        <div id="tool" class="tool-chip" hidden></div>
+      </div>
+    </section>
+
+    <aside class="chat">
+      <div id="messages" class="messages">
+        <div class="empty">
+          <p class="empty-title">Ask me anything</p>
+          <div class="suggestions">
+            <button type="button">What's the weather like this weekend?</button>
+            <button type="button">What's new in tech today?</button>
+            <button type="button">Set a timer for 10 minutes for pasta</button>
+            <button type="button">Remember that my favourite team is Benfica</button>
+          </div>
+        </div>
+      </div>
+      <form id="composer" class="composer" autocomplete="off">
+        <button id="micBtn" class="mic" type="button" title="Talk (Space)">
+          <svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+        </button>
+        <input id="input" type="text" placeholder="Type a message or press Space to talk…">
+        <button class="send" type="submit" title="Send">
+          <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </form>
+    </aside>
+  </main>
+
+  <div id="toasts" class="toasts"></div>
+  <script src="app.js"></script>
+</body>
+</html>
