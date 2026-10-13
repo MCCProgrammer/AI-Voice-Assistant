@@ -46,6 +46,8 @@ cp .env.example .env               # then paste your OPENROUTER_API_KEY into .en
 python main.py
 ```
 
+> **Free OpenRouter key?** Claude models need credits. Set `MODEL=nvidia/nemotron-3-super-120b-a12b:free` (or any model ending in `:free` that supports tools) to try it at no cost. Free models are limited to a few dozen requests per day.
+
 The first launch downloads the small wake word model (~5 MB). On macOS, allow microphone access for your terminal when asked.
 
 **Controls:** say “Hey Jarvis”, press <kbd>Space</kbd> or click the mic to talk · <kbd>Esc</kbd> to stop · or just type.
